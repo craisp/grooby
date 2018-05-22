@@ -3,6 +3,9 @@ require 'ruby-mpd'
 require 'rpi_gpio'
 require 'syslog/logger'
 require 'active_record'
+require_relative 'album'
+
+BASE_DIR = '/home/pi/Desktop/grooby/'
 
 def init_card_reader
   $log.info 'Initializing card reader'
@@ -35,6 +38,15 @@ def init_buttons
   $control_buttons.each do |button|
     RPi::GPIO.setup button, as: :input, pull: :down
   end
+end
+
+def establish_db_connection
+  $log.info 'Trying to connect to database'
+  ActiveRecord::Base.establish_connection(
+    adapter: 'sqlite3',
+    database: BASE_DIR + 'database.sqlite3.db'
+  )
+  $log.info 'Database connected'
 end
 
 def start_playlist(card_uid)
@@ -144,6 +156,7 @@ $log.info 'grooby is grooving up'
 init_card_reader()
 init_buttons()
 init_mpd()
+establish_db_connection()
 
 card_thread = Thread.new{card_control()}
 button_thread = Thread.new{button_control()}
