@@ -1,25 +1,12 @@
-require 'mfrc522'
-require 'ruby-mpd'
-require 'rpi_gpio'
-require 'syslog/logger'
-require 'active_record'
-require_relative 'album'
-
-BASE_DIR = '/home/pi/Desktop/grooby/'
-
-def init_card_reader
-  $log.info 'Initializing card reader'
-
-  $r = MFRC522.new
-end
+require_relative 'gems'
+require_relative 'helper'
 
 def init_mpd
   $log.info 'Initializing MPD'
   
   $mpd = MPD.new
   $mpd.connect
-  $mpd.stop
-  $mpd.clear
+  $mpd.pause = true
 end
 
 def init_buttons
@@ -30,6 +17,8 @@ def init_buttons
   $vol_down_button = 19
   $previous_button = 16
   $next_button = 21
+  
+  $halt_switch = 13
 
   $control_buttons = [$pause_button, $vol_up_button, $vol_down_button, $previous_button, $next_button]
   
@@ -38,15 +27,8 @@ def init_buttons
   $control_buttons.each do |button|
     RPi::GPIO.setup button, as: :input, pull: :down
   end
-end
-
-def establish_db_connection
-  $log.info 'Trying to connect to database'
-  ActiveRecord::Base.establish_connection(
-    adapter: 'sqlite3',
-    database: BASE_DIR + 'database.sqlite3.db'
-  )
-  $log.info 'Database connected'
+  
+  RPi::GPIO.setup $halt_switch, as: :input, pull: :down
 end
 
 def start_playlist(card_uid)
@@ -83,7 +65,8 @@ def wait_for_release_or_another_button
     when 1
       puts 'vol_down_button'
     when 2
-      puts 'previous_button'
+      require_relative 'webserver'
+      $webserver_thread = Thread.new{Webserver.run!}
     when 3
       puts 'next_button'
     end
@@ -111,33 +94,10 @@ def volume_down
   end
 end
 
-def card_control
-  $log.info 'Start listening to Cards'
-  
-  while(true)
-    begin
-
-      if $r.picc_request(MFRC522::PICC_REQA)
-        uid, sak = $r.picc_select
-        uid = uid.pack('C*').unpack('H*')[0]
-        start_playlist(uid)
-        $r.picc_halt
-      end
-
-
-    rescue Exception => e
-
-      puts "Exception #{e}"
-
-    end
-    sleep(0.2)
-  end
-end
-
 def button_control
   $log.info 'Start listening to buttons'
   
-  while(true)
+  while(!$ready_for_halt)
     if RPi::GPIO.high? $pause_button
       toggle_pause
       wait_for_release_or_another_button
@@ -148,17 +108,35 @@ def button_control
     volume_down && sleep(0.2) if RPi::GPIO.high? $vol_down_button
   end
 end
-  
 
-$log = Syslog::Logger.new 'grooby'
+def halt_control
+  $log.info 'Start listening for halt'
+  
+  while(!$ready_for_halt)
+    $ready_for_halt = RPi::GPIO.low? $halt_switch
+    sleep(0.5)
+  end
+end
+  
 $log.info 'grooby is grooving up'
 
+$ready_for_halt = false
+
+$current_configuration_card_uid = nil
+$webserver_thread = nil
+
+require_relative 'card_reader.rb'
 init_card_reader()
+
 init_buttons()
 init_mpd()
 establish_db_connection()
 
+halt_thread = Thread.new{halt_control()}
 card_thread = Thread.new{card_control()}
 button_thread = Thread.new{button_control()}
+
+$webserver_thread.join if !$webserver_thread.nil?
 card_thread.join
 button_thread.join
+

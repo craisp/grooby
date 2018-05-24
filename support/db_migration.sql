@@ -1,10 +1,14 @@
 BEGIN TRANSACTION;
-CREATE TABLE albums (
-  id integer,
-  card_uuid string,
-  button_number integer,
-  album_name string,
-  listen_count integer
+CREATE TABLE playlists (
+  card_uid STRING PRIMARY KEY,
+  button_number INTEGER UNIQUE,
+  title STRING NOT NULL,
+  listen_count INTEGER DEFAULT 0
+);
+CREATE TABLE songs (
+  uuid STRING PRIMARY KEY,
+  playlist_id STRING NOT NULL,
+  title STRING NOT NULL,
+  sort_index INTEGER NOT NULL
 );
 COMMIT;
-  
