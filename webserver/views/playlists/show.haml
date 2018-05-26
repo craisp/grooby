@@ -1,2 +1,27 @@
-Playlist der Karte
-= @playlist.card_uid
+%h1.mt-5.mb-4
+  = "Playlist \"#{@playlist.title}\""
+
+.row.mb-4
+  .col-xs-12.col-sm-6
+    - if @playlist.songs.any?
+      %ul.list-group
+        - @playlist.songs.each do |song|
+          %li.list-group-item
+            = song.title
+    - else
+      Bisher keine Songs vorhanden
+  
+  .col-xs-12.col-sm-6
+    %h4
+      Upload
+    %form.dropzone#dropzone{ action: "/playlisten/#{@playlist.card_uid}/songs", method: :post }
+      .fallback
+        %input{ name: 'file', type: 'file', multiple: true }
+
+%a.btn.btn-secondary.mr-2{ href: '/playlisten' }
+  Zurück zur Übersicht
+
+%form.d-inline-block{action: "/playlisten/#{@playlist.card_uid}", method: :post }
+  %input{type: 'hidden', name: '_method', value: 'delete'}
+  %button.btn.btn-danger
+    Playlist löschen

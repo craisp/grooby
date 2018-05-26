@@ -34,10 +34,17 @@ end
 def start_playlist(card_uid)
   $log.info 'Starting Playlist ' + card_uid
   
-  $mpd.stop
-  $mpd.clear
-  $mpd.where({file: card_uid}, {add: true})
-  $mpd.play
+  playlist = Playlist.find(card_uid)
+  
+  if playlist.present?
+    $mpd.stop
+    $mpd.clear
+    $mpd.send_command :load, "card_#{card_uid}"
+    $mpd.play
+    
+    playlist.listen_count += 1
+    playlist.save
+  end
 end
 
 def toggle_pause
@@ -72,6 +79,7 @@ def wait_for_release_or_another_button
     end
   end
   while($control_buttons.map{|button| RPi::GPIO.high? button}.any?)
+    sleep(0.1)
   end
   sleep(0.05)
 end
@@ -95,7 +103,8 @@ def volume_down
 end
 
 def button_control
-  $log.info 'Start listening to buttons'
+  $log.info 'Start
+   listening to buttons'
   
   while(!$ready_for_halt)
     if RPi::GPIO.high? $pause_button
@@ -106,6 +115,7 @@ def button_control
     $mpd.previous && $log.info('skipping back') && sleep(1) if RPi::GPIO.high? $previous_button
     volume_up && sleep(0.2) if RPi::GPIO.high? $vol_up_button
     volume_down && sleep(0.2) if RPi::GPIO.high? $vol_down_button
+    sleep(0.05)
   end
 end
 

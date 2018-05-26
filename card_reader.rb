@@ -26,6 +26,6 @@ def card_control
       puts "Exception #{e}"
 
     end
-    sleep(0.2)
+    sleep(1)
   end
 end

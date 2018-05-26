@@ -1,5 +1,18 @@
-Alle Playlisten
+%h1.mt-5.mb-4
+  Alle Playlisten
 
-- @playlists.each do |playlist|
-  .playlist
-    = playlist.card_uid
+%a.btn.btn-success.mb-4{ href: "/playlisten/neu" }
+  Neue Playliste anlegen
+  
+
+.row
+  - @playlists.each do |playlist|
+    .col-xs-12.col-sm-6.col-md-4
+      .card.text-center
+        .card-body
+          %h5.card-title
+            = playlist.title
+          %p.card-text
+            = "#{playlist.songs.count} Songs<br />#{playlist.listen_count} mal gestartet"
+          %a.btn.btn-primary{ href: "/playlisten/#{playlist.card_uid}" }
+            Ansehen & Upload

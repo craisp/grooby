@@ -1,0 +1,41 @@
+.row
+  %form.col-xs-12.col-md-6{ action: "/playlisten", method: "post" }
+    .form-group
+      %label{ for: "card-uid", }
+        NFC Karte (für den Karten-Modus)
+      - if locals[:card_uid_valid]
+        %input.form-control.is-valid#card-uid{ name: "card_uid", type: "text", placeholder: "Karten-ID", readonly: true, value: @playlist.card_uid }
+        %small#card_uid_help.form-text.text-muted
+          Wenn eine andere Karte verwendet werden soll, bitte scannen und Seite neu laden.
+      - else
+        %input.form-control.is-invalid#card-uid{ name: "card_uid", type: "text", placeholder: "Karten-ID", disabled: true, value: @playlist.card_uid }
+        .invalid-feedback
+          - if locals[:card_uid_present]
+            Diese Karte wird schon verwendet. Bitte eine neue scannen und Seite neu laden.
+          - else
+            Keine Karte gefunden. Bitte scannen und Seite neu laden.
+      
+    .form-group
+      %label{ for: "title" }
+        Playlist-Name
+      %input.form-control#title{ name: "title", type: "text", value: @playlist.title, placeholder: "Name eingeben", required: true }
+      
+    .form-group
+      %label{ for: "button-number" }
+        Taste festlegen (für den Tasten-Modus)
+      %select.form-control#button-number{name: "button_number"}
+        %option{value: ""}
+          keine Taste
+        - locals[:button_select].each do |button|
+          - if button.present?
+            %option{value: button[0], selected: @playlist.button_number == button[0]}
+              = button[1]
+    
+    %a.btn.btn-secondary.mr-2{ href: '/playlisten' }
+      Abbrechen
+    - if locals[:card_uid_valid]
+      %button.btn.btn-primary.d-inline-block{ type: "submit" }
+        Playlist anlegen
+    - else
+      %button.btn.btn-primary.d-inline-block{ type: "submit", disabled: true }
+        Playlist anlegen
