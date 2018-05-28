@@ -1,12 +1,32 @@
 require_relative 'gems'
 require_relative 'helper'
 
+def save_configuration
+  File.open('grooby.conf', 'w') { |f| f.puts $conf.to_yaml  }
+end
+
+def load_configuration
+  if File.exist?('grooby.conf')
+    $conf = YAML::load_file('grooby.conf')
+  else
+    $conf[:player_mode] = "card"
+    save_configuration()
+  end
+end
+
 def init_mpd
   $log.info 'Initializing MPD'
   
   $mpd = MPD.new
   $mpd.connect
   $mpd.pause = true
+end
+
+def start_card_reader
+  require_relative 'card_reader'
+  init_card_reader()
+  $card_thread = Thread.new{card_control()}
+  $card_reader_started = true
 end
 
 def init_buttons
@@ -73,9 +93,17 @@ def wait_for_release_or_another_button
       puts 'vol_down_button'
     when 2
       require_relative 'webserver'
+      
+      start_card_reader() unless $card_reader_started
       $webserver_thread = Thread.new{Webserver.run!}
     when 3
-      puts 'next_button'
+      if $conf[:player_mode] == "card"
+        $conf[:player_mode] = "button"
+      else
+        $conf[:player_mode] = "card"
+        start_card_reader() unless $card_reader_started
+      end
+      save_configuration()
     end
   end
   while($control_buttons.map{|button| RPi::GPIO.high? button}.any?)
@@ -103,18 +131,28 @@ def volume_down
 end
 
 def button_control
-  $log.info 'Start
-   listening to buttons'
+  $log.info 'Start listening to buttons'
   
   while(!$ready_for_halt)
-    if RPi::GPIO.high? $pause_button
-      toggle_pause
-      wait_for_release_or_another_button
+    case $conf[:player_mode]
+    when "card"
+      if RPi::GPIO.high? $pause_button
+        toggle_pause
+        wait_for_release_or_another_button
+      end
+      $mpd.next && $log.info('skipping forward') && sleep(1) if RPi::GPIO.high? $next_button
+      $mpd.previous && $log.info('skipping back') && sleep(1) if RPi::GPIO.high? $previous_button
+      volume_up && sleep(0.2) if RPi::GPIO.high? $vol_up_button
+      volume_down && sleep(0.2) if RPi::GPIO.high? $vol_down_button
+    when "button"
+      $control_buttons.each do |button|
+        if RPi::GPIO.high? button
+          playlist = Playlist.find_by(button_number: button)
+          start_playlist(playlist.card_uid) if playlist.present?
+          wait_for_release_or_another_button if button == $pause_button
+        end
+      end
     end
-    $mpd.next && $log.info('skipping forward') && sleep(1) if RPi::GPIO.high? $next_button
-    $mpd.previous && $log.info('skipping back') && sleep(1) if RPi::GPIO.high? $previous_button
-    volume_up && sleep(0.2) if RPi::GPIO.high? $vol_up_button
-    volume_down && sleep(0.2) if RPi::GPIO.high? $vol_down_button
     sleep(0.05)
   end
 end
@@ -127,26 +165,31 @@ def halt_control
     sleep(0.5)
   end
 end
-  
+ 
+# MAIN
+
 $log.info 'grooby is grooving up'
 
 $ready_for_halt = false
 
 $current_configuration_card_uid = nil
 $webserver_thread = nil
+$conf = {}
+$card_reader_started = false
 
-require_relative 'card_reader.rb'
-init_card_reader()
+load_configuration()
 
 init_buttons()
 init_mpd()
 establish_db_connection()
 
 halt_thread = Thread.new{halt_control()}
-card_thread = Thread.new{card_control()}
 button_thread = Thread.new{button_control()}
+$card_thread = nil
+
+start_card_reader() if $conf[:player_mode] == "card"
 
 $webserver_thread.join if !$webserver_thread.nil?
-card_thread.join
+$card_thread.join if !$card_thread.nil?
 button_thread.join
 

@@ -16,7 +16,7 @@ def card_control
         uid, sak = $r.picc_select
         uid = uid.pack('C*').unpack('H*')[0]
         $current_configuration_card_uid = uid
-        start_playlist(uid)
+        start_playlist(uid) if $conf[:player_mode] == "card"
         $r.picc_halt
       end
 
