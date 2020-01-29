@@ -147,9 +147,15 @@ def button_control
     when "button"
       $control_buttons.each do |button|
         if RPi::GPIO.high? button
-          playlist = Playlist.find_by(button_number: button)
-          start_playlist(playlist.card_uid) if playlist.present?
-          wait_for_release_or_another_button if button == $pause_button
+          if button != $current_playlist_button
+            playlist = Playlist.find_by(button_number: button)
+            start_playlist(playlist.card_uid) if playlist.present?
+            $current_playlist_button = button
+            wait_for_release_or_another_button if button == $pause_button
+          else
+            $mpd.next && $log.info('skipping forward') && sleep(1)
+            wait_for_release_or_another_button if button == $pause_button
+          end
         end
       end
     end
@@ -176,6 +182,7 @@ $current_configuration_card_uid = nil
 $webserver_thread = nil
 $conf = {}
 $card_reader_started = false
+$current_playlist_button = nil
 
 load_configuration()
 
