@@ -32,13 +32,13 @@ end
 def init_buttons
   $log.info 'Initializing buttons'
   
-  $pause_button = 20
-  $vol_up_button = 26
-  $vol_down_button = 19
-  $previous_button = 16
+  $pause_button = 26
+  $vol_up_button = 19
+  $vol_down_button = 16
+  $previous_button = 20
   $next_button = 21
   
-  $halt_switch = 13
+  # $halt_switch = 13
 
   $control_buttons = [$pause_button, $vol_up_button, $vol_down_button, $previous_button, $next_button]
   
@@ -48,7 +48,7 @@ def init_buttons
     RPi::GPIO.setup button, as: :input, pull: :down
   end
   
-  RPi::GPIO.setup $halt_switch, as: :input, pull: :down
+  # RPi::GPIO.setup $halt_switch, as: :input, pull: :down
 end
 
 def start_playlist(card_uid)
@@ -90,13 +90,6 @@ def wait_for_release_or_another_button
     when 0
       puts 'vol_up_button'
     when 1
-      puts 'vol_down_button'
-    when 2
-      require_relative 'webserver'
-      
-      start_card_reader() unless $card_reader_started
-      $webserver_thread = Thread.new{Webserver.run!}
-    when 3
       if $conf[:player_mode] == "card"
         $conf[:player_mode] = "button"
       else
@@ -104,6 +97,13 @@ def wait_for_release_or_another_button
         start_card_reader() unless $card_reader_started
       end
       save_configuration()
+    when 2
+      require_relative 'webserver'
+      
+      start_card_reader() unless $card_reader_started
+      $webserver_thread = Thread.new{Webserver.run!}
+    when 3
+      puts 'vol_down_button'
     end
   end
   while($control_buttons.map{|button| RPi::GPIO.high? button}.any?)
@@ -115,7 +115,7 @@ end
 def volume_up
   new_volume = $mpd.volume + 5
   
-  if new_volume <= 80
+  if new_volume <= 100
     $mpd.volume = new_volume
     $log.info 'Setting volume to ' + new_volume.to_s
   end
@@ -183,7 +183,7 @@ init_buttons()
 init_mpd()
 establish_db_connection()
 
-halt_thread = Thread.new{halt_control()}
+# halt_thread = Thread.new{halt_control()}
 button_thread = Thread.new{button_control()}
 $card_thread = nil
 
@@ -192,4 +192,3 @@ start_card_reader() if $conf[:player_mode] == "card"
 $webserver_thread.join if !$webserver_thread.nil?
 $card_thread.join if !$card_thread.nil?
 button_thread.join
-
