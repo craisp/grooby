@@ -153,9 +153,10 @@ def button_control
             $current_playlist_button = button
             wait_for_release_or_another_button if button == $pause_button
           else
-            $mpd.next && $log.info('skipping forward') && sleep(1)
+            $mpd.next && $log.info('skipping forward')
             wait_for_release_or_another_button if button == $pause_button
           end
+          sleep(1)
         end
       end
     end
@@ -169,6 +170,15 @@ def halt_control
   while(!$ready_for_halt)
     $ready_for_halt = RPi::GPIO.low? $halt_switch
     sleep(0.5)
+  end
+end
+
+def mpd_control
+  $log.info 'Start getting mpd status'
+
+  while(!$ready_for_halt)
+    $current_playlist_button = nil unless $mpd.playing?
+    sleep(1)
   end
 end
  
@@ -192,6 +202,7 @@ establish_db_connection()
 
 # halt_thread = Thread.new{halt_control()}
 button_thread = Thread.new{button_control()}
+mpd_thread = Thread.new{mpd_control()}
 $card_thread = nil
 
 start_card_reader() if $conf[:player_mode] == "card"
@@ -199,3 +210,4 @@ start_card_reader() if $conf[:player_mode] == "card"
 $webserver_thread.join if !$webserver_thread.nil?
 $card_thread.join if !$card_thread.nil?
 button_thread.join
+mpd_thread.join
